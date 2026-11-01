@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "30 21 * * *"   # 台灣時間每天 05:30
   workflow_dispatch:
+  push:                     # 爬蟲程式或流程更新時也跑一次（資料推送不會觸發）
+    branches: [main]
+    paths:
+      - "scraper/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: write
