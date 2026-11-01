@@ -1,0 +1,49 @@
+name: 每日更新照相資料
+
+on:
+  schedule:
+    - cron: "30 21 * * *"   # 台灣時間每天 05:30
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: 抓資料並發佈
+        run: |
+          set -u
+          git config user.name "speedradar-bot"
+          git config user.email "speedradar-bot@users.noreply.github.com"
+          run_scraper() {
+            # exit 0＝成功（有變或沒變），其他＝失敗（資料異常就不發佈，保留上一版）
+            java -jar scraper/speedradar-scraper.jar --out . --runner github-actions --deadline-sec 180
+          }
+          for attempt in 1 2 3; do
+            run_scraper
+            git add v1
+            if git diff --cached --quiet; then
+              echo "資料沒有變化"
+              exit 0
+            fi
+            git commit -q -m "資料更新 $(TZ=Asia/Taipei date '+%Y-%m-%d %H:%M')（GitHub Actions）"
+            if git push -q; then exit 0; fi
+            echo "推送衝突（電腦剛好也推了），以遠端最新版重跑"
+            git fetch -q origin
+            git reset -q --hard origin/main
+          done
+          exit 1
